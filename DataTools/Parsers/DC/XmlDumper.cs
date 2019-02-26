@@ -14,28 +14,72 @@ namespace DataTools.Parsers.DC
         public static void Parse()
         {
             var dc = DCT.GetDataCenter();
-            foreach (var group in DCT.DataCenter.Root.Children.GroupBy(x => x.Name))
+            var namesCount = new Dictionary<string, int>();
+            var childCount = new Dictionary<string, int>();
+
+            var names = new List<string>();
+            var initial = new Dictionary<string, int>();
+            Directory.CreateDirectory("xml/");
+
+            foreach (var child in DCT.DataCenter.Root.Children)
             {
-                string dir2, format;
-                if (group.Count() > 1)
+                childCount.TryGetValue(child.Name, out var val);
+                childCount[child.Name] = val + 1;   
+            }
+
+
+            int i = 0;
+            foreach (var child in DCT.DataCenter.Root.Children)
+            {
+                string filename;
+
+                if (childCount[child.Name] == 1)
                 {
-                    dir2 = "xml/" + group.Key + "/";
-                    format = "{0}-{1}.xml";
+                    filename = "xml/" + child.Name;
                 }
                 else
                 {
-                    dir2 = "xml/";
-                    format = "{0}.xml";
+                    filename = "xml/" + child.Name + "/";
+                    Directory.CreateDirectory(filename);
+
+                    filename += child.Name;
+
+                    foreach (var attribute in child.Attributes)
+                    {
+                        if ((attribute.Name == "id" || attribute.Name.EndsWith("Id")) && attribute.Value.ToString() != "0")
+                        {
+                            filename += "-" + attribute.Name + "-" + attribute.Value;
+                        }
+                    }
+
+                    if (namesCount.TryGetValue(filename, out var count))
+                    {
+                        namesCount[filename] = count + 1;
+                        
+                        if (count == 1)
+                        {
+                            var initialIndex = initial[filename];
+                            names[initialIndex] += "-0";
+                        }
+                        
+                        filename += "-" + count;
+                    }
+                    else
+                    {
+                        namesCount[filename] = 1;
+                        initial[filename] = i;
+                    }
                 }
 
-                Directory.CreateDirectory(dir2);
-                int i = 0;
-                foreach (var mainObject in group)
-                {
-                    var element = ConvertToXElement(mainObject);
-                    element.Save(dir2 + string.Format(format, mainObject.Name, i));
-                    i++;
-                }
+                names.Add(filename);
+                i++;
+            }
+
+
+            foreach (var item in names.Zip(DCT.DataCenter.Root.Children, (s, e) => new {filename = s + ".xml", element = e}))
+            {
+                var element = ConvertToXElement(item.element);
+                element.Save(item.filename);
             }
         }
 
